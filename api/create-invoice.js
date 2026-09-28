@@ -9,7 +9,7 @@ module.exports = async (req, res) => {
         description: 'Unlock a 3-card spread: Past, Present and Future.',
         payload: 'premium_spread_' + Date.now(),
         currency: 'XTR',
-        prices: [{ label: '3-Card Spread', amount: 50 }]
+        prices: [{ label: '3-Card Spread', amount: 10 }]
       })
     });
     const data = await r.json();
