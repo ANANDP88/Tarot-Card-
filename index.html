@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Daily Tarot</title>
+<style>
+  :root{
+    --bg:#0a1128; --card-bg:#152238; --accent:#60a5fa; --accent2:#3b82f6; --text:#e0f2ff; --sub:#93b8dd;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:
+      radial-gradient(circle at 20% 10%, rgba(96,165,250,.3), transparent 45%),
+      radial-gradient(circle at 80% 25%, rgba(59,130,246,.3), transparent 40%),
+      radial-gradient(circle at 50% 90%, rgba(96,165,250,.25), transparent 50%),
+      var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow-x:hidden}
+  .wrap{max-width:480px;margin:0 auto;padding:24px 16px 60px;text-align:center;min-height:100%}
+  h1{font-size:20px;margin:8px 0 4px}
+  .sub{color:var(--sub);font-size:13px;margin-bottom:28px}
+  .stage{perspective:1200px;width:220px;height:360px;margin:0 auto 24px;cursor:pointer}
+  .card{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .8s cubic-bezier(.4,.2,.2,1)}
+  .card.flipped{transform:rotateY(180deg)}
+  .face{position:absolute;inset:0;backface-visibility:hidden;border-radius:20px;overflow:hidden;
+    background:rgba(255,255,255,.06);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    box-shadow:0 8px 32px rgba(59,130,246,.3),inset 0 1px 0 rgba(255,255,255,.18);
+    border:1px solid rgba(255,255,255,.2)}
+  .back{display:flex;align-items:center;justify-content:center;font-size:56px;
+    background:linear-gradient(135deg,rgba(96,165,250,.4),rgba(59,130,246,.45));
+    text-shadow:0 0 20px rgba(96,165,250,.9)}
+  .front{transform:rotateY(180deg)}
+  .front img{width:100%;height:100%;object-fit:cover;display:block;opacity:.95}
+  .glow{position:absolute;inset:-30px;border-radius:28px;background:radial-gradient(circle,rgba(96,165,250,.4),transparent 70%);
+    opacity:0;transition:opacity .6s;pointer-events:none;filter:blur(4px)}
+  .card.flipped ~ .glow, .stage.revealed .glow{opacity:1}
+  .name{font-size:18px;font-weight:600;margin:6px 0 2px;min-height:22px;background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .meaning{font-size:14px;color:var(--sub);line-height:1.5;min-height:20px;padding:0 8px}
+  .hint{font-size:12px;color:var(--sub);opacity:.7;margin-top:6px}
+  .redraw{margin-top:18px;background:rgba(255,255,255,.09);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    border:1px solid rgba(96,165,250,.3);color:var(--text);
+    padding:10px 20px;border-radius:24px;font-size:13px;display:none;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.15)}
+  .redraw.show{display:inline-block}
+  .mute{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));right:14px;
+    background:rgba(255,255,255,.09);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(96,165,250,.25);border-radius:50%;width:36px;height:36px;
+    color:var(--sub);font-size:16px;opacity:.9}
+
+  .unlock{margin-top:22px;background:linear-gradient(135deg,rgba(96,165,250,.45),rgba(59,130,246,.55));
+    border:1px solid rgba(255,255,255,.25);color:#fff;padding:12px 22px;border-radius:26px;font-size:14px;font-weight:600;
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 6px 24px rgba(59,130,246,.35)}
+  .unlock:disabled{opacity:.6}
+  .spread{display:flex;gap:10px;justify-content:center;margin-top:22px}
+  .slot{flex:1;max-width:140px}
+  .slot img{width:100%;border-radius:12px;border:1px solid rgba(255,255,255,.2);box-shadow:0 6px 20px rgba(59,130,246,.3)}
+  .slot .pos{font-size:11px;color:var(--accent);margin:6px 0 2px;text-transform:uppercase;letter-spacing:1px}
+  .slot .nm{font-size:12px;font-weight:600}
+  .slot .mn{font-size:11px;color:var(--sub);line-height:1.4;margin-top:2px}
+</style>
+</head>
+<body>
+<button class="mute" id="muteBtn" onclick="toggleMute()">🔊</button>
+<div class="wrap">
+  <h1>🔮 Daily Tarot</h1>
+  <div class="sub">Tap the card to reveal your reading</div>
+
+  <div class="stage" id="stage" onclick="drawOrReveal()">
+    <div class="card" id="card">
+      <div class="face back">✦</div>
+      <div class="face front"><img id="cardImg" src="" alt=""></div>
+    </div>
+    <div class="glow"></div>
+  </div>
+
+  <div class="name" id="cardName"></div>
+  <div class="meaning" id="cardMeaning"></div>
+  <div class="hint" id="hint">Tap to draw today's card</div>
+  <button class="redraw" id="redrawBtn" onclick="reset()">Draw again</button>
+  <div><button class="unlock" id="unlockBtn" onclick="buyPremium()">✨ Unlock 3-Card Spread — 10 ⭐</button></div>
+  <div class="spread" id="spread"></div>
+</div>
+
+<script>
+// ---- Card data: built from exact filenames present in /repo root ----
+const majorArcana = [
+  {file:"00_Fool.jpg", name:"The Fool", meaning:"New beginnings, spontaneity, a leap of faith into the unknown."},
+  {file:"01_Magician.jpg", name:"The Magician", meaning:"Willpower, resourcefulness, turning ideas into action."},
+  {file:"02_High_Priestess.jpg", name:"The High Priestess", meaning:"Intuition, hidden knowledge, trusting your inner voice."},
+  {file:"03_Empress.jpg", name:"The Empress", meaning:"Abundance, nurturing, creativity in full bloom."},
+  {file:"04_Emperor.jpg", name:"The Emperor", meaning:"Structure, authority, building something that lasts."},
+  {file:"05_Hierophant.jpg", name:"The Hierophant", meaning:"Tradition, guidance, learning from established wisdom."},
+  {file:"06_Lovers.jpg", name:"The Lovers", meaning:"Connection, choices, aligning with what truly matters."},
+  {file:"07_Chariot.jpg", name:"The Chariot", meaning:"Determination, willpower, moving forward with control."},
+];
+
+const suits = {
+  Cups:   {label:"Cups",      theme:"emotions, relationships and intuition"},
+  Pents:  {label:"Pentacles", theme:"work, money and material stability"},
+  Swords: {label:"Swords",    theme:"thoughts, conflict and communication"},
+  Wands:  {label:"Wands",     theme:"passion, creativity and action"},
+};
+const numberInfo = {
+  1:["Ace","a fresh start"], 2:["Two","balance and choices"], 3:["Three","growth and collaboration"],
+  4:["Four","stability and structure"], 5:["Five","change and challenge"], 6:["Six","harmony and generosity"],
+  7:["Seven","reflection and reassessment"], 8:["Eight","movement and mastery"], 9:["Nine","fulfillment nearing completion"],
+  10:["Ten","completion and culmination"], 11:["Page","curiosity and new learning"], 12:["Knight","bold, focused action"],
+  13:["Queen","nurturing mastery"], 14:["King","authority and command"],
+};
+// exact numbers present per suit, based on uploaded files
+const present = {
+  Cups:   [5,6,7,8,9,10,11,12,13],
+  Pents:  [1,2,3,4,5,6,7,8,9,10,11,13,14],
+  Swords: [1,2,4,5,6,7,8,9,10,11,12,13,14],
+  Wands:  [1,2,3,4,5,6,7,8,9,10,11,12,13,14],
+};
+
+const minorArcana = [];
+Object.keys(present).forEach(suitKey => {
+  present[suitKey].forEach(num => {
+    const [rank, meaning] = numberInfo[num];
+    const padded = String(num).padStart(2,'0');
+    minorArcana.push({
+      file: `${suitKey}${padded}.jpg`,
+      name: `${rank} of ${suits[suitKey].label}`,
+      meaning: `${meaning.charAt(0).toUpperCase()+meaning.slice(1)}, expressed through ${suits[suitKey].theme}.`
+    });
+  });
+});
+
+const deck = [...majorArcana, ...minorArcana];
+
+// ---- Telegram integration ----
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  // Note: we keep our own fixed pink/purple design rather than following
+  // the user's Telegram theme colors, since this app has an intentional look.
+}
+
+// ---- Sound (built with WebAudio so no external files needed) ----
+let muted = false;
+function toggleMute(){
+  muted = !muted;
+  document.getElementById('muteBtn').textContent = muted ? '🔇' : '🔊';
+}
+function playTone(freq, dur, type='sine', vol=0.15){
+  if (muted) return;
+  try{
+    const ctx = window._actx || (window._actx = new (window.AudioContext||window.webkitAudioContext)());
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = vol;
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    o.stop(ctx.currentTime + dur);
+  }catch(e){}
+}
+function playWhoosh(){ playTone(220,0.25,'sawtooth',0.08); }
+function playChime(){ playTone(880,0.6,'sine',0.12); setTimeout(()=>playTone(1320,0.5,'sine',0.09),120); }
+
+// ---- Draw logic ----
+let revealed = false;
+function pickCard(){
+  return deck[Math.floor(Math.random()*deck.length)];
+}
+function drawOrReveal(){
+  if (revealed) return;
+  revealed = true;
+  const c = pickCard();
+  document.getElementById('cardImg').src = c.file;
+  document.getElementById('cardImg').alt = c.name;
+  document.getElementById('cardName').textContent = c.name;
+  document.getElementById('cardMeaning').textContent = c.meaning;
+  document.getElementById('hint').style.display = 'none';
+  document.getElementById('redrawBtn').classList.add('show');
+
+  playWhoosh();
+  document.getElementById('card').classList.add('flipped');
+  document.getElementById('stage').classList.add('revealed');
+  setTimeout(playChime, 400);
+  if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+}
+// ---- Premium (Telegram Stars) ----
+async function buyPremium(){
+  const btn = document.getElementById('unlockBtn');
+  if (!tg || !tg.openInvoice){ alert('Open this app inside Telegram to pay with Stars.'); return; }
+  btn.disabled = true;
+  try{
+    const r = await fetch('/api/create-invoice', {method:'POST'});
+    const data = await r.json();
+    if (!data.link) throw new Error(data.error || 'No invoice link');
+    tg.openInvoice(data.link, status => {
+      btn.disabled = false;
+      if (status === 'paid') showSpread();
+    });
+  }catch(e){
+    btn.disabled = false;
+    alert('Payment could not start. Please try again.');
+  }
+}
+function showSpread(){
+  const picks = [...deck].sort(()=>Math.random()-0.5).slice(0,3);
+  const labels = ['Past','Present','Future'];
+  document.getElementById('spread').innerHTML = picks.map((c,i)=>
+    `<div class="slot"><img src="${c.file}" alt="${c.name}"><div class="pos">${labels[i]}</div>
+     <div class="nm">${c.name}</div><div class="mn">${c.meaning}</div></div>`).join('');
+  playChime();
+  if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+}
+
+function reset(){
+  revealed = false;
+  document.getElementById('spread').innerHTML = '';
+  document.getElementById('card').classList.remove('flipped');
+  document.getElementById('stage').classList.remove('revealed');
+  document.getElementById('cardName').textContent = '';
+  document.getElementById('cardMeaning').textContent = '';
+  document.getElementById('hint').style.display = 'block';
+  document.getElementById('redrawBtn').classList.remove('show');
+}
+</script>
+</body>
+  </html>
